@@ -13,6 +13,7 @@ Cada ADR registra uma decisão de arquitetura: o contexto, o que foi decidido e 
 | [0007](0007-symbol-no-padrao-b3-mercado-a-vista.md) | `Symbol` no padrão B3, começando pelo mercado à vista | Aceita |
 | [0008](0008-normas-da-cvm-como-fonte-de-requisitos.md) | Regulação do mercado como fonte de requisitos | Aceita |
 | [0009](0009-recusa-cancelamento-e-alteracao.md) | Recusa, cancelamento e alteração (cancel/replace) | Aceita |
+| [0010](0010-arquitetura-orientada-a-eventos.md) | Arquitetura orientada a eventos | Proposta |
 
 ## Modelo
 
