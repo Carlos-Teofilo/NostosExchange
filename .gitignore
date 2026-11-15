@@ -481,5 +481,5 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-# Referências pessoais de estudo (links e materiais) — não versionadas
-/references/
+# Material pessoal de estudo (conceitos e links) — não versionado
+/estudos/
