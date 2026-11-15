@@ -15,6 +15,7 @@ Motor de emparelhamento de ordens (*Matching Engine* / *Limit Order Book*) em .N
 | Domínio: Entidade `Order` (criação e aceite pela bolsa) | ✅ Concluído |
 | Domínio: Recusa, cancelamento e alteração (cancel/replace) | ✅ Concluído |
 | Testes unitários do domínio | ⏳ Próximo passo |
+| Event Sourcing: eventos da `Order` e event store em memória | ⏳ Planejado |
 | Execução da ordem (`Fill`) | ⏳ Planejado |
 | Livro de ofertas e matching engine | ⏳ Planejado |
 | Cadastro de instrumentos (`Instrument`), opções e futuros | ⏳ Planejado |
@@ -23,7 +24,7 @@ Motor de emparelhamento de ordens (*Matching Engine* / *Limit Order Book*) em .N
 
 - **Domínio rico:** as regras de negócio vivem nas entidades e nos Value Objects, que nunca existem em estado inválido.
 - **Guiado pela regulação:** as principais leis do mercado (6.385, 9.613 e LGPD) e as Resoluções CVM 35, 50, 62 e 135 são fontes de requisitos, mapeadas artigo por artigo em [docs/regulatory](docs/regulatory/README.md) ([ADR 0008](docs/adr/0008-normas-da-cvm-como-fonte-de-requisitos.md)).
-- **Orientado a eventos:** cada mudança no domínio vira um evento imutável, o que também atende às exigências de histórico auditável e reconstituível ([ADR 0010](docs/adr/0010-arquitetura-orientada-a-eventos.md), em proposta).
+- **Event Sourcing:** os eventos são a fonte da verdade. Cada mudança no domínio vira um evento imutável, e o estado é reconstruído a partir deles. Isso também atende às exigências de histórico auditável e reconstituível ([ADR 0010](docs/adr/0010-arquitetura-orientada-a-eventos.md)).
 - **Decisões registradas:** toda escolha relevante de arquitetura tem um [ADR](docs/adr/README.md).
 
 ## Stack

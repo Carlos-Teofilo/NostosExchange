@@ -1,7 +1,7 @@
-# 0010 — Arquitetura orientada a eventos
+# 0010 — Arquitetura orientada a eventos com Event Sourcing
 
-- **Status:** Proposta
-- **Data:** 2026-11-16
+- **Status:** Aceita
+- **Data:** 2026-11-16 (proposta e aceite)
 
 ## Contexto
 
@@ -18,19 +18,57 @@ Além de ser um objetivo técnico do projeto, as normas mapeadas apontam na mesm
 | Dar pronta **visibilidade e disseminação pública** às ofertas e negócios | [Res. CVM 135, art. 119, II e III](../regulatory/cvm-135.md) |
 | Tratamento equitativo, que na prática exige **determinismo** | [Res. CVM 62, art. 2º, IV](../regulatory/cvm-62.md) |
 
-## Decisão (proposta)
-
-- Cada transição de estado de um agregado produz um **evento de domínio** imutável, nomeado no passado (por exemplo, `OrderCreated`, `OrderAccepted`, `OrderRejected`, `OrderCanceled`, `OrderReplaced`).
-- Os eventos carregam apenas identificadores de pessoas (`ClientId`, `TraderId`), nunca dados cadastrais ([LGPD](../regulatory/lgpd.md)).
-- O matching engine deve ser **determinístico**: a mesma sequência de eventos de entrada sempre produz os mesmos eventos de saída.
-
-## Em aberto
-
-A decisão principal ainda precisa ser tomada:
+Havia duas opções:
 
 | Opção | Como funciona | A favor | Contra |
 | --- | --- | --- | --- |
-| **Event Sourcing** | Os eventos **são** a fonte da verdade. O estado da `Order` é reconstruído reaplicando os eventos. | Histórico completo e reconstituível por construção; encaixa diretamente na Res. 135, art. 107, § 2º. | Mais complexo: versionamento de eventos, snapshots, projeções para leitura. |
-| **Estado + eventos de domínio** | O estado atual é a fonte da verdade, e os eventos são publicados a cada mudança (por exemplo, via Transactional Outbox). | Mais simples de começar e de consultar. | O histórico depende de os eventos serem guardados à parte; é possível o estado e os eventos divergirem se houver erro. |
+| **Event Sourcing** | Os eventos **são** a fonte da verdade. O estado é reconstruído reaplicando os eventos. | Histórico completo e reconstituível por construção; atende diretamente à Res. 135, art. 107, § 2º. | Mais complexo: versionamento de eventos, snapshots, projeções para leitura. |
+| **Estado + eventos de domínio** | O estado atual é a fonte da verdade, e os eventos são publicados a cada mudança. | Mais simples de começar e de consultar. | O histórico depende de os eventos serem guardados à parte; estado e eventos podem divergir. |
 
-Este ADR passa a **Aceita** quando essa escolha for feita, e será atualizado com a opção escolhida e suas consequências.
+## Decisão
+
+Adotar **Event Sourcing**. Os eventos são a única fonte da verdade sobre os agregados.
+
+### Regras
+
+1. **O estado só muda por eventos.** Cada método público de um agregado (por exemplo, `Order.Cancel`) segue sempre três passos:
+
+   ```text
+   1. valida as regras de negócio      → pode lançar DomainException
+   2. cria o evento (o fato)           → OrderCanceled { ... }
+   3. Apply(evento)                    → único lugar que altera o estado
+   ```
+
+2. **O `Apply` nunca valida nem falha.** O evento representa algo que **já aconteceu**. Validar no `Apply` impediria reconstruir agregados a partir de eventos antigos, se uma regra mudasse depois.
+3. **Eventos são imutáveis, append-only e nomeados no passado** (`OrderCreated`, `OrderAccepted`, `OrderRejected`, `OrderCanceled`, `OrderReplaced`). Um evento gravado nunca é editado nem apagado; correções viram eventos novos.
+4. **Reconstrução** (*rehydration*): um agregado é recriado aplicando o seu histórico em ordem, por meio de `Order.FromHistory(eventos)`.
+5. **Metadados de todo evento:**
+   - `EventId`: identificador único do evento;
+   - `OccurredAt`: instante do fato, vindo do `TimeProvider`;
+   - **versão do agregado**: posição do evento no histórico daquela ordem (1, 2, 3...). É a base da **concorrência otimista**: se dois comandos tentarem gravar a versão 4 ao mesmo tempo, o segundo é rejeitado.
+6. **Eventos não carregam dados cadastrais.** Só identificadores (`ClientId`, `TraderId`), conforme a [LGPD](../regulatory/lgpd.md).
+7. **Determinismo:** aplicar a mesma sequência de eventos sempre produz o mesmo estado. Nada de `DateTime.Now` ou `Guid.NewGuid()` dentro do `Apply`; tudo o que varia vem dentro do evento.
+8. **Event store inicial em memória**, implementado no próprio projeto, para fins de aprendizado.
+
+## Consequências
+
+- ✅ O histórico exigido pelas normas deixa de ser uma funcionalidade extra: **é** o modelo de persistência.
+- ✅ É possível responder "qual era o estado às 13:02?" reaplicando os eventos até esse instante.
+- ✅ Os eventos são a base natural para publicar market data (Res. 135, art. 119) e alimentar o monitoramento de PLD.
+- ❌ A `Order` precisa ser refatorada para o padrão "validar → criar evento → `Apply`".
+- ❌ Consultas ("todas as ordens ativas do cliente X") não podem ser feitas direto nos eventos; exigem **projeções**.
+- ❌ Mudar o formato de um evento já gravado exige estratégia de evolução (*upcasting*).
+
+## Ordem de implementação
+
+1. **Testes** das regras atuais da `Order`, antes da migração. Eles provam que a refatoração não quebrou nenhuma regra.
+2. Refatorar a `Order` para Event Sourcing, com os eventos e `FromHistory`.
+3. Event store em memória, com concorrência otimista.
+
+## Decisões futuras (ADRs próprios)
+
+- Tecnologia de persistência do event store (por exemplo, KurrentDB ou Marten sobre PostgreSQL).
+- Projeções e CQRS para leitura.
+- Snapshots, se a reconstrução ficar lenta.
+- Evolução e versionamento de eventos (*upcasting*).
+- Número de sequência **global** para a ordem de entrada no livro ([Res. CVM 135, art. 119, § 1º](../regulatory/cvm-135.md)), que é diferente da versão de cada agregado.
