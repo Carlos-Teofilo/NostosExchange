@@ -26,6 +26,11 @@ A coluna **Origem** indica quem fornece o dado. Ela define o que entra na criaç
 | `Status` | `OrderStatus` | Entidade | Controlado pelas transições de estado. |
 | `FilledQuantity` | `long` | Entidade | Quantidade já executada. Começa em 0. |
 | `LeavesQuantity` | `long` | Calculado | `Quantity - FilledQuantity`. |
+| `IsActive` | `bool` | Calculado | `true` em `PendingNew`, `New` e `PartiallyFilled`. |
+| `OrigClOrdId` | `Guid?` | Entidade | `ClOrdId` da ordem substituída, quando esta nasceu de uma alteração ([ADR 0009](../adr/0009-recusa-cancelamento-e-alteracao.md)). |
+| `ClosedAt` | `DateTimeOffset?` | Entidade | Instante em que a ordem atingiu um status final. |
+| `RejectReason` | `RejectReason?` | Entidade | Motivo da recusa. Preenchido só em `Rejected`. |
+| `CancelReason` | `CancelReason?` | Entidade | Motivo do cancelamento. Preenchido só em `Canceled`. |
 
 ### Precisão dos timestamps
 
@@ -90,7 +95,24 @@ Todos começam em `1` e usam `byte` como tipo subjacente ([ADR 0003](../adr/0003
 | `TimeInForce` | `Day`, `Gtc`, `Ioc`, `Fok` |
 | `OrderSource` | `HomeBroker`, `TradingDesk`, `Algorithm`, `MobileApp`, `FixApi` |
 | `ExecutionMethod` | `Automated`, `Manual` |
-| `OrderStatus` | `PendingNew`, `New`, `PartiallyFilled`, `Filled`, `Canceled`, `Rejected` |
+| `OrderStatus` | `PendingNew`, `New`, `PartiallyFilled`, `Filled`, `Canceled`, `Rejected`, `Replaced` |
+| `RejectReason` | `ClientNotEligible`, `RiskLimitExceeded`, `UnknownSymbol`, `MarketClosed`, `DuplicateClOrdId` |
+| `CancelReason` | `ClientRequest`, `Expired`, `UnfilledRemainder`, `NotFullyFillable`, `ExchangeAction` |
+
+### Motivos de recusa e cancelamento
+
+| Motivo | Quando | Base |
+| --- | --- | --- |
+| `RejectReason.ClientNotEligible` | Cliente não cadastrado ou com cadastro desatualizado | [Res. CVM 35, art. 37, II](../regulatory/cvm-35.md) |
+| `RejectReason.RiskLimitExceeded` | Ordem acima dos limites operacionais do cliente | [Res. CVM 35, art. 16, § 1º, II](../regulatory/cvm-35.md) |
+| `RejectReason.UnknownSymbol` | Ativo inexistente ou indisponível | — |
+| `RejectReason.MarketClosed` | Fora do horário de negociação | [Res. CVM 35, art. 21, § 1º, II](../regulatory/cvm-35.md) |
+| `RejectReason.DuplicateClOrdId` | `ClOrdId` repetido para o cliente | [ADR 0001](../adr/0001-clordid-como-chave-de-idempotencia.md) |
+| `CancelReason.ClientRequest` | Pedido do cliente | [Res. CVM 35, art. 21, § 1º, VII](../regulatory/cvm-35.md) |
+| `CancelReason.Expired` | Fim da validade (`Day` no encerramento do pregão) | [Res. CVM 35, art. 21, § 1º, IV](../regulatory/cvm-35.md) |
+| `CancelReason.UnfilledRemainder` | Saldo de uma ordem `Ioc` | `TimeInForce` |
+| `CancelReason.NotFullyFillable` | Ordem `Fok` sem liquidez para execução integral | `TimeInForce` |
+| `CancelReason.ExchangeAction` | Determinação da bolsa (ex.: procedimento especial) | [Res. CVM 135, art. 120, IV](../regulatory/cvm-135.md) |
 
 ### Semântica do `TimeInForce`
 
@@ -116,22 +138,54 @@ Regras que envolvem mais de um campo. Uma violação lança `InvalidOrderExcepti
 5. `OrderType == Market` ⇒ `Price` nulo **e** `TimeInForce ∈ { Ioc, Fok }`.
 6. Todo enum recebido deve ter valor definido (`Enum.IsDefined`), porque um cast de `int` aceita qualquer número.
 7. `ExchangeReceivedAt >= BrokerReceivedAt`.
+8. Todo instante registrado por uma transição é `>=` ao último evento da ordem (`ExchangeReceivedAt`, ou `BrokerReceivedAt` se a ordem ainda não foi aceita).
 
 ## Ciclo de vida
 
 ```text
-                Create()            AcceptByExchange()
-  (corretora) ───────────► PendingNew ─────────────────► New ──► PartiallyFilled ──► Filled
-                               │                          │            │
-                               └──► Rejected              └────────────┴──► Canceled
+                            Create()
+                               │
+                               ▼
+  Rejected ◄── Reject() ── PendingNew ── Cancel() ──► Canceled
+                               │
+                               │ AcceptByExchange()
+                               ▼
+                    New / PartiallyFilled ── (execução) ──► Filled
+                        │               │
+                Cancel()│               │Replace()
+                        ▼               ▼
+                    Canceled        Replaced ──► nova Order em PendingNew
+                                                 (OrigClOrdId = original)
 ```
 
 | Transição | Método | Situação |
 | --- | --- | --- |
 | → `PendingNew` | `Order.Create(...)` | ✅ Implementado |
-| `PendingNew` → `New` | `AcceptByExchange(TimeProvider)` | ✅ Implementado |
-| `PendingNew` → `Rejected` | — | ⏳ Planejado |
+| `PendingNew` → `New` (ou `PartiallyFilled`, se herdou execuções de uma alteração) | `AcceptByExchange(TimeProvider)` | ✅ Implementado |
+| `PendingNew` → `Rejected` | `Reject(RejectReason, TimeProvider)` | ✅ Implementado |
+| `PendingNew`/`New`/`PartiallyFilled` → `Canceled` | `Cancel(CancelReason, TimeProvider)` | ✅ Implementado |
+| `New`/`PartiallyFilled` → `Replaced` + nova ordem | `Replace(Guid, Quantity, Price, TimeProvider)` | ✅ Implementado |
 | `New`/`PartiallyFilled` → `PartiallyFilled`/`Filled` | — | ⏳ Planejado (execução) |
-| `New`/`PartiallyFilled` → `Canceled` | — | ⏳ Planejado (cancelamento, IOC e expiração de `Day`) |
 
-Uma transição inválida (por exemplo, aceitar uma ordem que já está `New`) lança `InvalidOrderStateException`.
+`Rejected`, `Canceled`, `Replaced` e `Filled` são **status finais**: nenhuma transição sai deles. Uma transição inválida (por exemplo, recusar uma ordem que já está `New`) lança `InvalidOrderStateException`.
+
+## Regras de recusa, cancelamento e alteração
+
+A Res. CVM 35 (art. 21, § 1º, V e VII, e § 3º) exige que essas regras sejam definidas, claras e divulgadas previamente. Estas são as regras do NostosExchange ([ADR 0009](../adr/0009-recusa-cancelamento-e-alteracao.md)):
+
+**Recusa**
+- Só é possível **antes** de a ordem entrar no livro (`PendingNew`).
+- Exige um motivo (`RejectReason`).
+
+**Cancelamento**
+- É possível enquanto a ordem estiver ativa (`PendingNew`, `New` ou `PartiallyFilled`).
+- Cancela apenas o **saldo**. O que já foi executado permanece (`FilledQuantity` não muda).
+- Exige um motivo (`CancelReason`), inclusive nos cancelamentos automáticos do `TimeInForce`.
+
+**Alteração (cancel/replace)**
+- Só para ordens **limitadas** que estejam **no livro** (`New` ou `PartiallyFilled`).
+- Só **preço e quantidade** podem mudar, e pelo menos um deles precisa mudar. Para mudar lado, ativo ou validade, cancele e envie uma ordem nova.
+- O cliente envia um **novo `ClOrdId`**, que é a chave de idempotência da alteração.
+- A quantidade informada é a **total**, incluindo o já executado, e precisa ser maior que `FilledQuantity`.
+- A ordem original passa a `Replaced`. A nova ordem nasce em `PendingNew`, com `OrigClOrdId` apontando para a original, e precisa ser aceita pela bolsa.
+- **A alteração perde a prioridade de tempo:** a nova ordem recebe um novo `ExchangeReceivedAt` ([Res. CVM 135, art. 119, § 1º](../regulatory/cvm-135.md)).

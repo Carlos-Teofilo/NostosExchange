@@ -65,7 +65,7 @@ O NostosExchange modela uma cadeia de negociação real: o **intermediário** (c
 
 | Prioridade | Item | Normas |
 | --- | --- | --- |
-| 1 | Transições de recusa, cancelamento e alteração da `Order` | Res. 35, art. 21, § 1º |
+| ✅ | ~~Transições de recusa, cancelamento e alteração da `Order`~~ ([ADR 0009](../adr/0009-recusa-cancelamento-e-alteracao.md)) | Res. 35, art. 21, § 1º |
 | 2 | Livro com prioridade preço-tempo e número de sequência | Res. 135, art. 119, § 1º; Res. 62, art. 2º, IV |
 | 3 | Prevenção de autonegociação | Lei 6.385, art. 27-C; Res. 62, art. 2º; Res. 50, art. 20, II, a |
 | 4 | Eventos de domínio imutáveis (ordens e negócios, com as duas partes) | Res. 35, art. 48; Res. 135, arts. 107 e 186; Res. 50, art. 25 |

@@ -47,6 +47,23 @@ public sealed class Order
 
     public long LeavesQuantity => Quantity.Value - FilledQuantity;
 
+    /// <summary>
+    /// <c>ClOrdId</c> da ordem substituída, quando esta ordem nasceu de uma alteração (<see cref="Replace"/>).
+    /// </summary>
+    public Guid? OrigClOrdId { get; }
+
+    /// <summary>Momento em que a ordem atingiu um status final (UTC). Nulo enquanto ativa.</summary>
+    public DateTimeOffset? ClosedAt { get; private set; }
+
+    /// <summary>Preenchido quando <see cref="Status"/> é <see cref="OrderStatus.Rejected"/>.</summary>
+    public RejectReason? RejectReason { get; private set; }
+
+    /// <summary>Preenchido quando <see cref="Status"/> é <see cref="OrderStatus.Canceled"/>.</summary>
+    public CancelReason? CancelReason { get; private set; }
+
+    /// <summary>Indica se a ordem ainda pode ser executada, cancelada ou alterada.</summary>
+    public bool IsActive => Status is OrderStatus.PendingNew or OrderStatus.New or OrderStatus.PartiallyFilled;
+
     private Order(
         Guid clOrdId,
         Guid clientId,
@@ -59,7 +76,9 @@ public sealed class Order
         TimeInForce timeInForce,
         OrderSource orderSource,
         ExecutionMethod executionMethod,
-        DateTimeOffset brokerReceivedAt)
+        DateTimeOffset brokerReceivedAt,
+        Guid? origClOrdId = null,
+        long filledQuantity = 0)
     {
         ClOrdId = clOrdId;
         ClientId = clientId;
@@ -73,6 +92,8 @@ public sealed class Order
         OrderSource = orderSource;
         ExecutionMethod = executionMethod;
         BrokerReceivedAt = brokerReceivedAt;
+        OrigClOrdId = origClOrdId;
+        FilledQuantity = filledQuantity;
         Status = OrderStatus.PendingNew;
     }
 
@@ -133,23 +154,145 @@ public sealed class Order
     /// <exception cref="InvalidOrderException">Quando o relógio da bolsa indica um instante anterior ao recebimento pela corretora.</exception>
     public void AcceptByExchange(TimeProvider clock)
     {
-        ArgumentNullException.ThrowIfNull(clock);
-
         if (Status != OrderStatus.PendingNew)
         {
             throw new InvalidOrderStateException(
                 $"Only orders in {OrderStatus.PendingNew} can be accepted by the exchange. Current status: {Status}.");
         }
 
-        var receivedAt = clock.GetUtcNow();
+        ExchangeReceivedAt = Now(clock);
 
-        if (receivedAt < BrokerReceivedAt)
+        // Uma ordem que nasceu de uma alteração herda a quantidade já executada da original.
+        Status = FilledQuantity > 0 ? OrderStatus.PartiallyFilled : OrderStatus.New;
+    }
+
+    /// <summary>
+    /// Recusa a ordem antes de ela entrar no livro (Res. CVM 35, art. 21, § 1º, V).
+    /// </summary>
+    /// <exception cref="InvalidOrderStateException">Quando a ordem não está em <see cref="OrderStatus.PendingNew"/>.</exception>
+    public void Reject(RejectReason reason, TimeProvider clock)
+    {
+        EnsureDefined(reason, nameof(Enums.RejectReason));
+
+        if (Status != OrderStatus.PendingNew)
         {
-            throw new InvalidOrderException("ExchangeReceivedAt cannot be earlier than BrokerReceivedAt.");
+            throw new InvalidOrderStateException(
+                $"Only orders in {OrderStatus.PendingNew} can be rejected. Current status: {Status}.");
         }
 
-        ExchangeReceivedAt = receivedAt;
-        Status = OrderStatus.New;
+        Close(OrderStatus.Rejected, Now(clock));
+        RejectReason = reason;
+    }
+
+    /// <summary>
+    /// Cancela o saldo não executado da ordem (Res. CVM 35, art. 21, § 1º, VII).
+    /// A quantidade já executada (<see cref="FilledQuantity"/>) não é desfeita.
+    /// </summary>
+    /// <exception cref="InvalidOrderStateException">Quando a ordem já está em um status final.</exception>
+    public void Cancel(CancelReason reason, TimeProvider clock)
+    {
+        EnsureDefined(reason, nameof(Enums.CancelReason));
+        EnsureActive("canceled");
+
+        Close(OrderStatus.Canceled, Now(clock));
+        CancelReason = reason;
+    }
+
+    /// <summary>
+    /// Altera o preço e/ou a quantidade de uma ordem que está no livro (Res. CVM 35, art. 21, § 1º, VII).
+    /// Segue o modelo cancel/replace do FIX: esta ordem passa a <see cref="OrderStatus.Replaced"/> e uma nova
+    /// ordem, com novo <c>ClOrdId</c>, é devolvida em <see cref="OrderStatus.PendingNew"/>. Ver ADR 0009.
+    /// </summary>
+    /// <param name="newClOrdId">Identificador da nova ordem, gerado pelo cliente (chave de idempotência da alteração).</param>
+    /// <param name="newQuantity">Quantidade total da nova ordem, incluindo o que já foi executado.</param>
+    /// <param name="newPrice">Novo preço limite.</param>
+    /// <param name="clock">Relógio da corretora, que registra o recebimento da alteração.</param>
+    /// <exception cref="InvalidOrderStateException">Quando a ordem não está ativa no livro.</exception>
+    /// <exception cref="InvalidOrderException">Quando a alteração viola alguma regra.</exception>
+    public Order Replace(Guid newClOrdId, Quantity newQuantity, Price newPrice, TimeProvider clock)
+    {
+        ArgumentNullException.ThrowIfNull(newQuantity);
+        ArgumentNullException.ThrowIfNull(newPrice);
+
+        if (Status is not (OrderStatus.New or OrderStatus.PartiallyFilled))
+        {
+            throw new InvalidOrderStateException(
+                $"Only orders resting in the book ({OrderStatus.New} or {OrderStatus.PartiallyFilled}) can be replaced. Current status: {Status}.");
+        }
+
+        if (OrderType != OrderType.Limit)
+        {
+            throw new InvalidOrderException("Only limit orders can be replaced.");
+        }
+
+        if (newClOrdId == Guid.Empty || newClOrdId == ClOrdId)
+        {
+            throw new InvalidOrderException("A replacement requires a new, non-empty ClOrdId.");
+        }
+
+        if (newQuantity.Value <= FilledQuantity)
+        {
+            throw new InvalidOrderException("The new quantity must be greater than the quantity already filled.");
+        }
+
+        if (newQuantity == Quantity && newPrice == Price)
+        {
+            throw new InvalidOrderException("A replacement must change the price or the quantity.");
+        }
+
+        var receivedAt = Now(clock);
+
+        var replacement = new Order(
+            newClOrdId,
+            ClientId,
+            TraderId,
+            Symbol,
+            Side,
+            OrderType,
+            newQuantity,
+            newPrice,
+            TimeInForce,
+            OrderSource,
+            ExecutionMethod,
+            receivedAt,
+            origClOrdId: ClOrdId,
+            filledQuantity: FilledQuantity);
+
+        Close(OrderStatus.Replaced, receivedAt);
+
+        return replacement;
+    }
+
+    private void EnsureActive(string operation)
+    {
+        if (!IsActive)
+        {
+            throw new InvalidOrderStateException($"Only active orders can be {operation}. Current status: {Status}.");
+        }
+    }
+
+    private void Close(OrderStatus finalStatus, DateTimeOffset closedAt)
+    {
+        Status = finalStatus;
+        ClosedAt = closedAt;
+    }
+
+    /// <summary>
+    /// Lê o relógio e garante que o novo instante não seja anterior ao último evento registrado na ordem.
+    /// </summary>
+    private DateTimeOffset Now(TimeProvider clock)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+
+        var now = clock.GetUtcNow();
+        var lastEvent = ExchangeReceivedAt ?? BrokerReceivedAt;
+
+        if (now < lastEvent)
+        {
+            throw new InvalidOrderException("A new timestamp cannot be earlier than the last event recorded on the order.");
+        }
+
+        return now;
     }
 
     private static void EnsureIdentifiers(Guid clOrdId, Guid clientId, Guid? traderId)

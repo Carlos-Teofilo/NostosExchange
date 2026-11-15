@@ -13,8 +13,9 @@ Motor de emparelhamento de ordens (*Matching Engine* / *Limit Order Book*) em .N
 | Domínio: Value Objects (`Price`, `Quantity`, `Symbol`) | ✅ Concluído |
 | Domínio: Enums da ordem | ✅ Concluído |
 | Domínio: Entidade `Order` (criação e aceite pela bolsa) | ✅ Concluído |
+| Domínio: Recusa, cancelamento e alteração (cancel/replace) | ✅ Concluído |
 | Testes unitários do domínio | ⏳ Próximo passo |
-| Execução, cancelamento e expiração da ordem | ⏳ Planejado |
+| Execução da ordem (`Fill`) | ⏳ Planejado |
 | Livro de ofertas e matching engine | ⏳ Planejado |
 | Cadastro de instrumentos (`Instrument`), opções e futuros | ⏳ Planejado |
 
@@ -47,7 +48,7 @@ NostosExchange/
         └── Orders/
             ├── DomainExceptions/      # Exceções específicas do agregado
             ├── Entities/              # Order (raiz do agregado)
-            ├── Enums/                 # Side, OrderType, TimeInForce, OrderSource, ExecutionMethod, OrderStatus
+            ├── Enums/                 # Side, OrderType, TimeInForce, OrderSource, ExecutionMethod, OrderStatus, RejectReason, CancelReason
             └── ValueObjects/          # Price, Quantity, Symbol
 ```
 

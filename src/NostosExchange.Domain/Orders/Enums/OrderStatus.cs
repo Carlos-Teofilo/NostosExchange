@@ -11,5 +11,8 @@ public enum OrderStatus : byte
     PartiallyFilled = 3,
     Filled = 4,
     Canceled = 5,
-    Rejected = 6
+    Rejected = 6,
+
+    /// <summary>Substituída por uma nova ordem (alteração de preço ou quantidade).</summary>
+    Replaced = 7
 }
