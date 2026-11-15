@@ -1,6 +1,8 @@
 # Resolução CVM 62/2022 — Práticas vedadas
 
-Proíbe a criação de condições artificiais de demanda, oferta ou preço, a manipulação de preços, as operações fraudulentas e as práticas não equitativas. Regulamenta os arts. 4º, V e 27-C da [Lei 6.385](lei-6385.md) e substituiu a antiga Instrução CVM 8/1979.
+Proíbe a criação de condições artificiais de demanda, oferta ou preço, a manipulação de preços, as operações fraudulentas e as práticas não equitativas. Foi editada com base nos arts. 8º, I e 18, II, "b" da [Lei 6.385](lei-6385.md) e substituiu a antiga Instrução CVM 8/1979.
+
+> **Esfera administrativa × esfera penal.** A mesma conduta pode ser tratada em duas esferas. Na **administrativa**, a Res. CVM 62 define as práticas vedadas, e a violação é infração grave punida pela CVM (art. 4º). Na **penal**, o art. 27-C da Lei 6.385 tipifica a manipulação de mercado como **crime**, com pena de reclusão. A resolução concretiza o objetivo do art. 4º, V da lei (coibir fraude e manipulação), mas não regulamenta o tipo penal.
 
 Ver também: [índice regulatório](README.md)
 
