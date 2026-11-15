@@ -16,14 +16,14 @@ Ou seja, as duas pontas modeladas no projeto (corretora e bolsa) têm obrigaçõ
 | Norma e artigo | Exigência (resumo) | Como o projeto trata | Situação |
 | --- | --- | --- | --- |
 | Lei 9.613, art. 10, I | **Identificar os clientes** e manter o cadastro atualizado. | O cadastro fica fora do domínio de ordens; a `Order` exige `ClientId` válido. | 🟡 |
-| Lei 9.613, art. 10, § 2º | Conservar cadastros e registros por **no mínimo 5 anos**. | Mesma exigência da [Res. 35, art. 48](cvm-35.md) e da [Res. 135, art. 186](cvm-135.md): histórico imutável. | ⏳ |
+| Lei 9.613, art. 10, § 2º | Conservar cadastros e registros por **no mínimo 5 anos**. | Mesma exigência da [Res. 35, art. 48](cvm-35.md) e da [Res. 135, art. 186](cvm-135.md): atendida pelo event store ([ADR 0010](../adr/0010-arquitetura-orientada-a-eventos.md)). | ⏳ |
 | Lei 9.613, art. 11, I | Dar **atenção especial** a operações que possam indicar indícios de crime. | Cabe ao monitoramento, alimentado pelos eventos de domínio. | ⏳ |
 | Lei 9.613, art. 11, II | Comunicar ao **COAF**, sem dar ciência ao envolvido. | Processo de compliance, fora do motor. | ➖ |
 | Res. 50, art. 20, II, a | Atipicidade: operações **entre as mesmas partes** ou em benefício delas, com ganhos ou perdas seguidos. | Exige que cada negócio registre comprador e vendedor (`ClientId` das duas ofertas). | ⏳ |
 | Res. 50, art. 20, II, b | Atipicidade: **oscilação significativa** de volume ou frequência de negócios. | Exige histórico por cliente, com horário. | ⏳ |
 | Res. 50, art. 20, II, k | Atipicidade: operações **fora do preço de mercado**. | Reforça a necessidade de túnel de preço / banda de oscilação ([Res. 135](cvm-135.md)). | ⏳ |
-| Res. 50, art. 25 | Manter registro de **toda** operação com valores mobiliários, **independentemente do valor**. | Toda ordem e todo negócio viram eventos persistidos; não há limite mínimo. | ⏳ |
-| Res. 50, art. 26 | Manter a documentação à disposição da CVM por **no mínimo 5 anos**. | Retenção do event store. | ⏳ |
+| Res. 50, art. 25 | Manter registro de **toda** operação com valores mobiliários, **independentemente do valor**. | Event Sourcing: toda ordem e todo negócio viram eventos persistidos, sem limite mínimo de valor ([ADR 0010](../adr/0010-arquitetura-orientada-a-eventos.md)). | ⏳ |
+| Res. 50, art. 26 | Manter a documentação à disposição da CVM por **no mínimo 5 anos**. | Retenção do event store ([ADR 0010](../adr/0010-arquitetura-orientada-a-eventos.md)). | ⏳ |
 
 ## Consequências para o modelo
 

@@ -25,7 +25,7 @@ Ver também: [índice regulatório](README.md) · [modelo de domínio da `Order`
 | Art. 21, § 2º, II | Em ordens simultâneas, as de clientes **não vinculados** têm prioridade sobre as de **pessoas vinculadas** ao intermediário. | Requer indicar se o cliente é pessoa vinculada. | ⏳ |
 | Art. 23, caput e § 2º | Identificar o **comitente final** em toda ordem. Negócios da mesa podem identificá-lo em até 30 minutos. | `ClientId` é obrigatório já na criação, inclusive para a mesa. O modelo é **mais restritivo** que a norma e não suporta a identificação posterior. | ✅ |
 | Art. 37, II | Vedado aceitar ordens de clientes **não cadastrados** ou com **cadastro desatualizado**. | A verificação caberá à camada de aplicação (o cadastro fica fora do domínio de ordens). O domínio já oferece a recusa com `RejectReason.ClientNotEligible`. | 🟡 |
-| Art. 48 | Manter documentos, registros de ordens e trilhas de auditoria por **no mínimo 5 anos**. | Indica um histórico imutável (event store). | ⏳ |
+| Art. 48 | Manter documentos, registros de ordens e trilhas de auditoria por **no mínimo 5 anos**. | Event Sourcing: os eventos da ordem formam a trilha de auditoria, imutável e append-only ([ADR 0010](../adr/0010-arquitetura-orientada-a-eventos.md)). | ⏳ |
 
 ## Lacunas priorizadas
 
