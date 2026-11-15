@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NostosExchange.Domain/NostosExchange.Domain.csproj" />
+  </Folder>
+</Solution>
