@@ -14,6 +14,7 @@ Cada ADR registra uma decisão de arquitetura: o contexto, o que foi decidido e 
 | [0008](0008-normas-da-cvm-como-fonte-de-requisitos.md) | Regulação do mercado como fonte de requisitos | Aceita |
 | [0009](0009-recusa-cancelamento-e-alteracao.md) | Recusa, cancelamento e alteração (cancel/replace) | Aceita |
 | [0010](0010-arquitetura-orientada-a-eventos.md) | Arquitetura orientada a eventos com Event Sourcing | Aceita |
+| [0011](0011-estrategia-de-testes.md) | Estratégia de testes (xUnit v3, `FakeTimeProvider`, Test Data Builder) | Aceita |
 
 ## Modelo
 

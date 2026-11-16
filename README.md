@@ -14,7 +14,7 @@ Motor de emparelhamento de ordens (*Matching Engine* / *Limit Order Book*) em .N
 | Domínio: Enums da ordem | ✅ Concluído |
 | Domínio: Entidade `Order` (criação e aceite pela bolsa) | ✅ Concluído |
 | Domínio: Recusa, cancelamento e alteração (cancel/replace) | ✅ Concluído |
-| Testes unitários do domínio | ⏳ Próximo passo |
+| Testes unitários do domínio | 🚧 Em andamento |
 | Event Sourcing: eventos da `Order` e event store em memória | ⏳ Planejado |
 | Execução da ordem (`Fill`) | ⏳ Planejado |
 | Livro de ofertas e matching engine | ⏳ Planejado |
@@ -32,26 +32,32 @@ Motor de emparelhamento de ordens (*Matching Engine* / *Limit Order Book*) em .N
 - .NET 10 / C# 14
 - Solution no formato `.slnx`
 - Nullable reference types habilitado
+- Testes com xUnit v3 e `FakeTimeProvider` ([ADR 0011](docs/adr/0011-estrategia-de-testes.md))
 
 ## Estrutura
 
 ```text
 NostosExchange/
 ├── NostosExchange.slnx
+├── global.json            # Habilita o Microsoft.Testing.Platform no dotnet test
 ├── README.md
 ├── docs/
 │   ├── domain/            # Modelagem do domínio (campos, regras e invariantes)
 │   ├── regulatory/        # Leis e normas da CVM usadas como referência de modelagem
 │   └── adr/               # Architecture Decision Records
-└── src/
-    └── NostosExchange.Domain/
-        ├── Shared/
-        │   └── DomainExceptions/      # DomainException (base)
-        └── Orders/
-            ├── DomainExceptions/      # Exceções específicas do agregado
-            ├── Entities/              # Order (raiz do agregado)
-            ├── Enums/                 # Side, OrderType, TimeInForce, OrderSource, ExecutionMethod, OrderStatus, RejectReason, CancelReason
-            └── ValueObjects/          # Price, Quantity, Symbol
+├── src/
+│   └── NostosExchange.Domain/
+│       ├── Shared/
+│       │   └── DomainExceptions/      # DomainException (base)
+│       └── Orders/
+│           ├── DomainExceptions/      # Exceções específicas do agregado
+│           ├── Entities/              # Order (raiz do agregado)
+│           ├── Enums/                 # Side, OrderType, TimeInForce, OrderSource, ExecutionMethod, OrderStatus, RejectReason, CancelReason
+│           └── ValueObjects/          # Price, Quantity, Symbol
+└── tests/
+    └── NostosExchange.Domain.Tests/
+        ├── Builders/                  # OrderBuilder (Test Data Builder)
+        └── Orders/                    # Espelha src/: ValueObjects/ e Entities/
 ```
 
 Cada agregado tem a própria pasta, com nome no plural (`Orders`). Assim o namespace `NostosExchange.Domain.Orders` não entra em conflito com a classe `Order`.
@@ -78,6 +84,14 @@ Cada agregado tem a própria pasta, com nome no plural (`Orders`). Assim o names
 ```bash
 dotnet build NostosExchange.slnx
 ```
+
+## Como testar
+
+```bash
+dotnet test
+```
+
+Os testes usam um relógio controlado (`FakeTimeProvider`), então são determinísticos. A estratégia está no [ADR 0011](docs/adr/0011-estrategia-de-testes.md).
 
 ## Documentação
 
