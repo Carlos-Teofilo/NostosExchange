@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/NostosExchange.Domain/NostosExchange.Domain.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NostosExchange.Domain.Tests/NostosExchange.Domain.Tests.csproj" />
+  </Folder>
 </Solution>
