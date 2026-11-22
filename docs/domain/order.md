@@ -44,6 +44,13 @@ Imutáveis, comparados por valor (`record`) e validados no construtor ([ADR 0005
 | --- | --- | --- | --- |
 | `Price` | `decimal` | `> 0` | `InvalidPriceException` |
 | `Quantity` | `long` | `> 0`, unidades inteiras ([ADR 0004](../adr/0004-representacao-numerica-de-quantidade-e-preco.md)) | `InvalidQuantityException` |
+
+**Lacunas conhecidas.** Os testes documentam o comportamento atual; quando estas regras forem implementadas, os casos correspondentes passarão a ser inválidos de propósito:
+
+| Value Object | Hoje | Onde será resolvido |
+| --- | --- | --- |
+| `Price` | Aceita qualquer valor `> 0`, inclusive `0.00001`: **não valida tick size** (na B3, ações usam R$ 0,01). | Cadastro de instrumentos (`Instrument`), com tick size por ativo ([ADR 0004](../adr/0004-representacao-numerica-de-quantidade-e-preco.md)). |
+| `Quantity` | Aceita até `long.MaxValue`: **não há limite superior**. | Risco pré-negociação, com limites por cliente e recusa `RiskLimitExceeded` ([Res. CVM 35, art. 16](../regulatory/cvm-35.md)). |
 | `Symbol` | `string` | Código do mercado à vista da B3. Ver [Symbol](#symbol) ([ADR 0007](../adr/0007-symbol-no-padrao-b3-mercado-a-vista.md)) | `InvalidSymbolException` |
 
 ### Symbol
