@@ -4,7 +4,8 @@ using NostosExchange.Domain.Orders.ValueObjects;
 namespace NostosExchange.Domain.Tests.Orders.ValueObjects;
 
 /// <summary>
-/// Cobre a regra de <c>Price</c> (<c>&gt; 0</c>) da tabela de Value Objects em docs/domain/order.md.
+/// Cobre a regra de <c>Price</c> (<c>&gt; 0</c>) da tabela de Value Objects em docs/domain/order.md
+/// e o ADR 0004 (preço como <c>decimal</c>, com tick size previsto para o futuro).
 /// </summary>
 public class PriceTests
 {
